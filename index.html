@@ -6,7 +6,8 @@
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css"/>
+        <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css"
+        />
         <!--<link rel="stylesheet" href="css/bootstrap.min.css" rel="stylesheet"/>-->
         <link rel="stylesheet" type="text/css" href="css/dc.css" />
         <!-- <script type="text/javascript" src="js/lib/d3.v3.min.js"></script>
@@ -36,13 +37,38 @@
                 var dateformat = d3.time.format("%Y-%m-%d");
                 data.forEach(function(d, i) {
                     d.date = dateformat.parse(d.date);
+                    d.pressure = +d.pressure;
                     if (d.date) {
                         d.year = d.date.getYear();
                         d.month = d3.time.month(d.date);
                     }
                 });
                 var chartFactory = instantdc(data, "body");
-                chartFactory.row("pressure");
+                // chartFactory.row({
+                //     field: "pressure"
+                // });
+                chartFactory.row({
+                    field: "date",
+                    mapper: "month"
+                });
+
+                chartFactory.bar({
+                     field: "pressure"
+                 });
+                 chartFactory.bar({
+                     field: "tmean"
+                 });
+                 chartFactory.row({
+                    field: "date",
+                    mapper: "year"
+                });
+                 chartFactory.bar({
+                     field: "windspeed"
+                 });
+                // chartFactory.bar({
+                //     field: "date",
+                //     mapper:"yearMonth"
+                // });
 
                 dc.renderAll();
             });

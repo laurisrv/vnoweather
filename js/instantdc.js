@@ -1,6 +1,42 @@
 instantdc = function(data, rootElement) {
     var chartsCreated = 0;
     var chartMap = {};
+    var mapUtils = {
+         yearMonth: {
+            value: d3.time.month,
+            units: d3.time.months,
+            round: d3.time.month.round,
+            scale: d3.time.scale,
+            mappedFieldName: function(field) {
+                return field + "idcYearMonth";
+            }
+        },
+        month: {
+            value: function(d){return d.getMonth()+1;},
+            units: d3.time.months,
+            round: d3.time.month.round,
+            scale: d3.time.scale,
+            mappedFieldName: function(field) {
+                return field + "idcMonth";
+            }
+        },
+        year: {
+            value: d3.time.year,
+            units: d3.time.years,
+            round: d3.time.year.round,
+            scale: d3.time.scale,
+            mappedFieldName: function(field) {
+                return field + "idcYear";
+            }
+        },
+        ident: {
+            value: d3.scale.identity(),
+            scale: d3.scale.linear,
+            mappedFieldName: function(field) {
+                return field + "idcIdent";
+            }
+        }
+    };
     var rootNode = d3.select(rootElement);
     rootNode.append("div").html("<h5 class='dc-data-count' style='clear:both;'>" + "<span class='filter-count'></span> selected out of <span class='total-count'>" + "</span> records | <a href='javascript:dc.filterAll(); dc.renderAll();'>Reset All</a></h5>");
     var createChartTemplate = function(name) {
@@ -27,7 +63,31 @@ instantdc = function(data, rootElement) {
     var filterdata = crossfilter(data);
     var allEntries = filterdata.groupAll();
     dc.dataCount(".dc-data-count").dimension(filterdata).group(allEntries);
-    var chartFactory = function(chart, field) {
+    var chartFactory = function(options, chartInitializer) {
+        var selector = options.selector;
+        if (!selector) {
+            selector = "#" + createChartTemplate();
+        }
+        if (!options.mapper) {
+            options.mapper = mapUtils.ident;
+        }
+        if (!options.mapper.value && typeof options.mapper == 'string') {
+            options.mapper = mapUtils[options.mapper];
+        }
+        var field = options.mapper.mappedFieldName(options.field);
+        var valMapFunc = options.mapper.value;
+        data.forEach(function(d) {
+            d[field] = valMapFunc(d[options.field]);
+        });
+
+        if (!options.scale) {
+            options.scale = options.mapper.scale().domain(d3.extent(data, function(d) {
+                return d[field];
+            }));
+        }
+        var chart = chartInitializer(selector);
+        chartMap[selector] = chart;
+
         var dim = filterdata.dimension(function(d) {
             return d[field];
         });
@@ -48,35 +108,39 @@ instantdc = function(data, rootElement) {
         return chart;
     };
 
-    chartFactory.row = function(field, selector) {
-        if (!selector) {
-            selector = "#" + createChartTemplate();
-        }
-
-        var chart = dc.rowChart(selector);
-        chartMap[selector] = chart;
-        chart.width(180).height(1000).margins({
-            top: 20,
-            left: 10,
-            right: 10,
-            bottom: 20
-        }).elasticX(true).xAxis().ticks(4);
-        return chartFactory(chart, field);
+    chartFactory.row = function(options) {
+        return chartFactory(options, function(selector) {
+            var chart = dc.rowChart(selector);
+            chart.width(180).height(500).margins({
+                top: 20,
+                left: 10,
+                right: 10,
+                bottom: 20
+            }).elasticX(true).xAxis().ticks(4);
+            return chart;
+        });
     };
 
-    chartFactory.bar = function(selector, field) {
-        var chart = dc.barChart(selector);
-        chart.width(990).height(40).margins({
-            top: 0,
-            right: 50,
-            bottom: 20,
-            left: 40
-        }).centerBar(true).gap(1)
-        //.x(d3.time.scale().domain([new Date(2012, 11, 1), new Date(2014, 03, 31)]))
-        .round(d3.time.month.round)
-        //.alwaysUseRounding(true)
-        .xUnits(d3.time.months);;
-        return chartFactory(chart, field);
+    chartFactory.bar = function(options) {
+        return chartFactory(options, function(selector) {
+            var chart = dc.barChart(selector);
+            chart.width(500).height(400).margins({
+                top: 0,
+                right: 50,
+                bottom: 20,
+                left: 40
+            }).centerBar(true).gap(1);
+            var xAxis = chart.x(options.scale);
+            if (options.mapper.round) {
+                xAxis.round(options.mapper.round);
+                //.alwaysUseRounding(true);
+            }
+            if (options.mapper.units) {
+                xAxis.xUnits(options.mapper.units);
+            }
+
+            return chart;
+        });
     };
 
     chartFactory.pie = function(selector, field) {
